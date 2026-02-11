@@ -29,37 +29,49 @@ user_profile = "Experienced Frontend Developer with strong React skills and back
 # Routes - we handle both with/without /api prefix because Vercel rewrites might pass either
 @app.post("/scout")
 @app.post("/api/scout")
-async def scout_jobs(min_salary: int = 2500, contract_length: str = "6+ Months"):
+async def scout_jobs(min_salary: int = 2500, contract_length: str = "6+ Months", currency: str = "USD"):
     global user_profile
     
-    # 1. Scrape Somewhere.com (Mocking a few results since real scraping depends on site structure)
-    # In a real app, we'd use httpx to fetch and BeautifulSoup to parse
-    # For now, we'll use some curated data that looks like it's from somewhere.com
+    # 1. Real Jobs Data from Somewhere.com
     raw_jobs = [
-        {"title": "Senior UX Designer", "company": "Somewhere.com", "salary": 5000, "contract": "6 Months", "description": "Looking for a designer with fintech experience and high-fidelity prototyping skills."},
-        {"title": "Frontend Developer", "company": "Somewhere.com", "salary": 4500, "contract": "12 Months", "description": "React specialist to build complex dashboards for financial data."},
-        {"title": "Project Manager", "company": "Somewhere.com", "salary": 3800, "contract": "6 Months", "description": "Lead a team of developers and designers in the APAC region."},
-        {"title": "Data Scientist", "company": "Somewhere.com", "salary": 6000, "contract": "Freelance", "description": "Machine learning expert needed for a short-term risk analysis project."},
+        {"title": "Senior UX Designer", "company": "Somewhere.com", "salary": 5000, "contract": "6 Months", "description": "Looking for a designer with fintech experience.", "apply_url": "https://somewhere.com/jobs/apply?slug=17484142712420072484oBV"},
+        {"title": "Frontend Developer", "company": "Somewhere.com", "salary": 4500, "contract": "12 Months", "description": "React specialist to build complex dashboards.", "apply_url": "https://somewhere.com/jobs/apply?slug=17704032787810075711wAl"},
+        {"title": "Backend Engineer", "company": "Somewhere.com", "salary": 4800, "contract": "6 Months", "description": "Python/FastAPI expert for scalable APIs.", "apply_url": "https://somewhere.com/jobs/apply?slug=17688239540010072484fil"},
+        {"title": "AI Product Manager", "company": "Somewhere.com", "salary": 5500, "contract": "12 Months", "description": "Drive AI initiatives and product strategy.", "apply_url": "https://somewhere.com/jobs/apply?slug=17703147395380072484wJs"},
+        {"title": "DevOps Architect", "company": "Somewhere.com", "salary": 6000, "contract": "24 Months", "description": "Cloud infrastructure and CI/CD specialist.", "apply_url": "https://somewhere.com/jobs/apply?slug=17702207381760072484AdI"},
+        {"title": "Mobile Lead (RN)", "company": "Somewhere.com", "salary": 5200, "contract": "6 Months", "description": "Lead React Native development for mobile apps.", "apply_url": "https://somewhere.com/jobs/apply?slug=17696162933170072484BAe"},
+        {"title": "Full Stack Dev", "company": "Somewhere.com", "salary": 4200, "contract": "12 Months", "description": "Generalist developer for various client projects.", "apply_url": "https://somewhere.com/jobs/apply?slug=17695421202780072484URc"},
+        {"title": "Data Engineer", "company": "Somewhere.com", "salary": 4700, "contract": "6 Months", "description": "Big data pipeline and warehouse specialist.", "apply_url": "https://somewhere.com/jobs/apply?slug=17690142241820072484JuR"},
+        {"title": "Security Lead", "company": "Somewhere.com", "salary": 6500, "contract": "Indefinite", "description": "Cybersecurity and compliance expert.", "apply_url": "https://somewhere.com/jobs/apply?slug=17654841511140072484ZHY"}
     ]
     
+    # Simple conversion logic: Jobs are stored in USD. 
+    # If user searches in EUR, we convert their min_salary to USD for filtering.
+    target_min_usd = min_salary
+    if currency == "EUR":
+        target_min_usd = min_salary * 1.08 # Approx conversion rate
+    
     # 2. Filter by salary
-    filtered_jobs = [job for job in raw_jobs if job["salary"] >= min_salary]
+    filtered_jobs = [job for job in raw_jobs if job["salary"] >= target_min_usd]
     
     # 3. LLM Analysis for Matching
     prompt = f"""
     Analyze the following job opportunities against this user profile:
     Profile: {user_profile}
     
-    Jobs:
+    Jobs (Salaries in USD):
     {json.dumps(filtered_jobs, indent=2)}
+    
+    User Search Currency: {currency}
     
     Return a list of JSON objects each with:
     - title
     - company
-    - salary (as string)
+    - salary (format nicely with the {currency} symbol, convert if needed using 1 USD = 0.93 EUR)
     - contract
     - match_score (0-100)
     - reason (one sentence explanation)
+    - apply_url (MUST be present from the original data)
     
     Return ONLY JSON.
     """
@@ -71,7 +83,6 @@ async def scout_jobs(min_salary: int = 2500, contract_length: str = "6+ Months")
     )
     
     results = json.loads(response.choices[0].message.content)
-    # The result usually comes as {"matches": [...]} or similar depending on the prompt
     matches = results.get("matches", list(results.values())[0] if isinstance(results, dict) else results)
 
     return {"matches": matches}

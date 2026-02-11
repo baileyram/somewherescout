@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 
 function App() {
   const [minSalary, setMinSalary] = useState(2500);
+  const [currency, setCurrency] = useState('USD');
   const [contractLength, setContractLength] = useState("6+ Months");
+  const [applicationCount, setApplicationCount] = useState(0);
   const [matches, setMatches] = useState([
     {
       title: "Senior UX Designer",
@@ -10,7 +12,8 @@ function App() {
       salary: "$4,000 - $6,000 / month",
       contract: "6 Months",
       match_score: 95,
-      reason: "Matches your experience in fintech"
+      reason: "Matches your experience in fintech",
+      apply_url: "https://somewhere.com/jobs/apply?slug=17484142712420072484oBV"
     },
     {
       title: "Frontend Developer",
@@ -18,7 +21,8 @@ function App() {
       salary: "$4,000 - $6,000 / month",
       contract: "6 Months",
       match_score: 92,
-      reason: "Strong proficiency in React"
+      reason: "Strong proficiency in React",
+      apply_url: "https://somewhere.com/jobs/apply?slug=17704032787810075711wAl"
     }
   ]);
 
@@ -29,13 +33,22 @@ function App() {
       const response = await fetch(`${API_URL}/scout`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ min_salary: minSalary, contract_length: contractLength })
+        body: JSON.stringify({
+          min_salary: minSalary,
+          contract_length: contractLength,
+          currency: currency
+        })
       });
       const data = await response.json();
       setMatches(data.matches);
     } catch (error) {
       console.error("Error scouting jobs:", error);
     }
+  };
+
+  const handleApply = (url) => {
+    window.open(url, '_blank');
+    setApplicationCount(prev => Math.min(prev + 1, 3));
   };
 
   const handleUpload = async (event) => {
@@ -56,6 +69,8 @@ function App() {
       console.error("Error uploading CV:", error);
     }
   };
+
+  const currencySymbol = currency === 'USD' ? '$' : '€';
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-[#020617] text-slate-900 dark:text-white p-4 md:p-8">
@@ -83,11 +98,29 @@ function App() {
 
           <div className="glass-light dark:glass-dark p-6 rounded-2xl flex-grow">
             <h2 className="text-sm font-semibold mb-6 uppercase tracking-wider text-slate-400">Filters</h2>
+
             <div className="mb-8">
-              <label className="block text-sm font-medium mb-4">Minimum Monthly Salary ($)</label>
+              <div className="flex justify-between items-center mb-4">
+                <label className="text-sm font-medium">Monthly Salary ({currencySymbol})</label>
+                <div className="flex bg-slate-200 dark:bg-white/5 rounded-lg p-1">
+                  <button
+                    onClick={() => setCurrency('USD')}
+                    className={`px-2 py-1 text-[10px] font-bold rounded-md transition-all ${currency === 'USD' ? 'bg-primary text-white shadow-sm' : 'text-slate-500'}`}
+                  >USD</button>
+                  <button
+                    onClick={() => setCurrency('EUR')}
+                    className={`px-2 py-1 text-[10px] font-bold rounded-md transition-all ${currency === 'EUR' ? 'bg-primary text-white shadow-sm' : 'text-slate-500'}`}
+                  >EUR</button>
+                </div>
+              </div>
               <div className="relative pt-6">
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 px-3 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-lg text-xs font-bold shadow-sm">
-                  ${minSalary.toLocaleString()}
+                <div className="absolute top-0 left-1/2 -translate-x-1/2">
+                  <input
+                    type="number"
+                    value={minSalary}
+                    onChange={(e) => setMinSalary(parseInt(e.target.value) || 0)}
+                    className="w-24 text-center px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-lg text-xs font-bold shadow-sm focus:ring-2 focus:ring-primary outline-none transition-all"
+                  />
                 </div>
                 <input
                   type="range"
@@ -98,8 +131,8 @@ function App() {
                   className="w-full h-1.5 bg-slate-200 dark:bg-white/10 rounded-lg appearance-none cursor-pointer accent-primary"
                 />
                 <div className="flex justify-between mt-3 text-xs text-slate-400">
-                  <span>$30</span>
-                  <span>$5,000</span>
+                  <span>{currencySymbol}30</span>
+                  <span>{currencySymbol}5,000</span>
                 </div>
               </div>
             </div>
@@ -127,6 +160,34 @@ function App() {
               Scout Jobs
             </button>
           </div>
+
+          <div className="glass-light dark:glass-dark p-6 rounded-2xl">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-400">Agentic Mode</h2>
+              <span className="material-symbols-outlined text-sm text-primary">smart_toy</span>
+            </div>
+            <p className="text-[11px] text-slate-500 mb-4 leading-relaxed">
+              Apply to 3 jobs to unlock automated agentic applications for Johannesburg, Manila, and EST timezones.
+            </p>
+            <div className="space-y-2">
+              <div className="flex justify-between text-[10px] text-slate-500 font-bold uppercase">
+                <span>Unlock Progress</span>
+                <span>{applicationCount}/3</span>
+              </div>
+              <div className="h-2 w-full bg-slate-200 dark:bg-white/10 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-primary transition-all duration-500 rounded-full"
+                  style={{ width: `${(applicationCount / 3) * 100}%`, backgroundColor: applicationCount === 3 ? '#10b981' : 'var(--primary)' }}
+                ></div>
+              </div>
+            </div>
+            {applicationCount === 3 && (
+              <button className="w-full mt-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-2">
+                <span className="material-symbols-outlined text-sm">bolt</span>
+                Enable Agentic Mode
+              </button>
+            )}
+          </div>
         </aside>
 
         {/* Main Content */}
@@ -138,7 +199,7 @@ function App() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {matches.map((job, index) => (
-              <div key={index} className="glass-light dark:glass-dark p-6 rounded-2xl border border-primary/20 hover:border-primary/50 transition-colors group">
+              <div key={index} className="glass-light dark:glass-dark p-6 rounded-2xl border border-primary/20 hover:border-primary/50 transition-all group hover:-translate-y-1">
                 <div className="flex justify-between items-start mb-6">
                   <div>
                     <h3 className="text-xl font-bold mb-1 group-hover:text-primary transition-colors">{job.title}</h3>
@@ -154,15 +215,25 @@ function App() {
                     </div>
                   </div>
                 </div>
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-300">
-                    <span className="material-symbols-outlined text-slate-400">payments</span>
-                    {job.salary}
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-300">
+                      <span className="material-symbols-outlined text-slate-400">payments</span>
+                      {job.salary}
+                    </div>
+                    <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-300">
+                      <span className="material-symbols-outlined text-slate-400">schedule</span>
+                      {job.contract}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-300">
-                    <span className="material-symbols-outlined text-slate-400">schedule</span>
-                    {job.contract}
-                  </div>
+
+                  <button
+                    onClick={() => handleApply(job.apply_url)}
+                    className="w-full py-3 bg-slate-200 dark:bg-white/5 hover:bg-slate-300 dark:hover:bg-white/10 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
+                  >
+                    View & Apply
+                    <span className="material-symbols-outlined text-xs">open_in_new</span>
+                  </button>
                 </div>
               </div>
             ))}
