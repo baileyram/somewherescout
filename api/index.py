@@ -21,19 +21,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/")
-def read_root():
-    return {"status": "FastAPI is running", "path": "/"}
-
-@app.get("/api")
-def read_api_root():
-    return {"status": "FastAPI is running", "path": "/api"}
-
 client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # In-memory storage for user profile (from CV)
 user_profile = "Experienced Frontend Developer with strong React skills and background in Fintech."
 
+# Routes - we handle both with/without /api prefix because Vercel rewrites might pass either
+@app.post("/scout")
 @app.post("/api/scout")
 async def scout_jobs(min_salary: int = 2500, contract_length: str = "6+ Months"):
     global user_profile
@@ -82,6 +76,7 @@ async def scout_jobs(min_salary: int = 2500, contract_length: str = "6+ Months")
 
     return {"matches": matches}
 
+@app.post("/upload")
 @app.post("/api/upload")
 async def upload_cv(file: UploadFile = File(...)):
     global user_profile
