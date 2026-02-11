@@ -21,6 +21,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/")
+def read_root():
+    return {"status": "FastAPI is running", "path": "/"}
+
+@app.get("/api")
+def read_api_root():
+    return {"status": "FastAPI is running", "path": "/api"}
+
 client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # In-memory storage for user profile (from CV)
