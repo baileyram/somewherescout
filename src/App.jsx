@@ -1,10 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createClient } from '@supabase/supabase-js';
+import { Toaster, toast } from 'sonner';
+
+// ... (Supabase config remains same)
+// Supabase Configuration (Env vars or placeholders)
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "YOUR_SUPABASE_URL";
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY || "YOUR_SUPABASE_KEY";
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 function App() {
+  // ... (State remains same)
   const [minSalary, setMinSalary] = useState(2500);
   const [currency, setCurrency] = useState('USD');
-  const [contractLength, setContractLength] = useState("6+ Months");
+  const [searchQuery, setSearchQuery] = useState("");
   const [applicationCount, setApplicationCount] = useState(0);
+  const [session, setSession] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  // ... (Matches state remains same)
   const [matches, setMatches] = useState([
     {
       title: "Senior UX Designer",
@@ -28,27 +41,92 @@ function App() {
 
   const API_URL = '/api';
 
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (session) {
+        fetchProfile(session.user.id);
+        toast.success("Welcome back to Somewhere Scout!");
+      }
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session) fetchProfile(session.user.id);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const fetchProfile = async (userId) => {
+    const { data } = await supabase.from('profiles').select('application_count').eq('id', userId).single();
+    if (data) setApplicationCount(data.application_count || 0);
+  }
+
+  const handleLogin = async () => {
+    const email = prompt("Enter your email for magic link:");
+    if (email) {
+      const { error } = await supabase.auth.signInWithOtp({ email });
+      if (error) toast.error(error.message);
+      else toast.success("Magic link sent! Check your email.");
+    }
+  }
+
+  // ... (handleScout remains same)
   const handleScout = async () => {
+    setLoading(true);
     try {
+      // ... fetch logic
       const response = await fetch(`${API_URL}/scout`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           min_salary: minSalary,
-          contract_length: contractLength,
+          query: searchQuery,
           currency: currency
         })
       });
       const data = await response.json();
       setMatches(data.matches);
+      toast.success(`Scouted ${data.matches.length} new opportunities!`);
     } catch (error) {
       console.error("Error scouting jobs:", error);
+      toast.error("Failed to scout jobs. Check backend.");
     }
+    setLoading(false);
   };
 
-  const handleApply = (url) => {
+  const handleApply = async (url) => {
     window.open(url, '_blank');
-    setApplicationCount(prev => Math.min(prev + 1, 3));
+
+    // Optimistic UI update
+    setApplicationCount(prev => {
+      const newCount = prev + 1;
+      if (newCount === 3) toast.success("Agentic Mode Unlocked! 🚀");
+      return newCount;
+    });
+
+    toast.info("Application tracked!");
+
+    // Track in backend (Fire and forget)
+    try {
+      const formData = new FormData();
+      formData.append('job_url', url);
+      await fetch(`${API_URL}/track`, {
+        method: 'POST',
+        body: formData
+      });
+
+      if (session) {
+        const { data } = await supabase.from('profiles').select('application_count').eq('id', session.user.id).single();
+        const newCount = (data?.application_count || 0) + 1;
+        await supabase.from('profiles').update({ application_count: newCount }).eq('id', session.user.id);
+      }
+    } catch (e) {
+      console.error("Tracking failed", e);
+    }
   };
 
   const handleUpload = async (event) => {
@@ -58,15 +136,20 @@ function App() {
     const formData = new FormData();
     formData.append('file', file);
 
+    const loadToast = toast.loading("Analyzing CV...");
+
     try {
       const response = await fetch(`${API_URL}/upload`, {
         method: 'POST',
         body: formData
       });
       const data = await response.json();
-      alert(data.message);
+      toast.dismiss(loadToast);
+      toast.success(data.message);
     } catch (error) {
+      toast.dismiss(loadToast);
       console.error("Error uploading CV:", error);
+      toast.error("Failed to upload CV.");
     }
   };
 
@@ -74,12 +157,28 @@ function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-[#020617] text-slate-900 dark:text-white p-4 md:p-8">
+      <Toaster position="top-right" richColors />
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row gap-8">
 
         {/* Sidebar */}
         <aside className="w-full md:w-80 space-y-6">
-          <div className="glass-light dark:glass-dark p-6 rounded-2xl">
+          <div className="glass-light dark:glass-dark p-6 rounded-2xl relative">
             <h2 className="text-sm font-semibold mb-4 uppercase tracking-wider text-slate-400">Your Profile</h2>
+
+            {!session ? (
+              <button
+                onClick={handleLogin}
+                className="w-full mb-4 py-2 bg-slate-800 text-white text-xs font-bold rounded-lg hover:bg-slate-700 transition-colors"
+              >
+                Login / Sign Up
+              </button>
+            ) : (
+              <div className="mb-4 text-xs font-medium text-emerald-500 flex items-center gap-2">
+                <span className="material-symbols-outlined text-sm">check_circle</span>
+                Logged in
+              </div>
+            )}
+
             <label className="w-full cursor-pointer py-3 px-4 bg-slate-200 dark:bg-white/5 hover:bg-slate-300 dark:hover:bg-white/10 rounded-xl text-sm font-medium transition-colors mb-6 flex items-center justify-center gap-2">
               <span className="material-symbols-outlined text-sm">upload_file</span>
               Upload Master CV
@@ -138,18 +237,16 @@ function App() {
             </div>
 
             <div className="mb-8">
-              <label className="block text-sm font-medium mb-2">Minimum Contract Length</label>
+              <label className="block text-sm font-medium mb-2">Search Jobs</label>
               <div className="relative">
-                <select
-                  value={contractLength}
-                  onChange={(e) => setContractLength(e.target.value)}
-                  className="w-full bg-slate-200 dark:bg-white/5 border-none rounded-xl py-3 px-4 text-sm appearance-none focus:ring-2 focus:ring-primary"
-                >
-                  <option>6+ Months</option>
-                  <option>12+ Months</option>
-                  <option>Freelance / Project</option>
-                </select>
-                <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">expand_more</span>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="e.g. React, Design..."
+                  className="w-full bg-slate-200 dark:bg-white/5 border-none rounded-xl py-3 px-4 text-sm focus:ring-2 focus:ring-primary outline-none placeholder:text-slate-400"
+                />
+                <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">search</span>
               </div>
             </div>
 
